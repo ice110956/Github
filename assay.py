@@ -11,6 +11,7 @@ import urllib
 import logging
 from bs4 import BeautifulSoup
 import os
+import threading
 
 
 def log():
@@ -181,6 +182,7 @@ def get_provider_description(url, cur, conn, thread_name):
             cur.execute(_sql, param)
             conn.commit()
         except:
+            logging.info("overlap insert provider" + provider_name)
             return -1
 
         #return provider id
@@ -241,96 +243,111 @@ def get_provider(url, cur, conn, id_services, thread_name):
                 conn.commit()
             except:
                 #print 'insert link error'
-                logging.error("insert link error")
+                logging.error("insert link error " + str(id_services) + str(id))
                 continue
 
 
-def c_2(t_name, category_3, category_2, category_1):
-    """category 2 thread function,in each second category"""
+class C2(threading.Thread):
+    def __init__(self, t_name, category_1, category_2, category_3):
+        threading.Thread.__init__(self)
+        self.t_name = t_name
+        self.category_3 = category_3
+        self.category_2 = category_2
+        self.category_1 = category_1
 
-    conn = sql()
-    cur = conn.cursor()
-    if category_3 is not None:
-        for c3 in category_3:
-            #for each second category
-            _sql = 'insert into category(c_name,c_category_1,c_category_2) values(%s,%s,%s)'
-            param = (c3.a.text.encode('utf-8'), category_1, category_2)
-            try:
-                cur.execute(_sql, param)
-                conn.commit()
-            except:
-                #print 'insert category error'
-                logging.error("insert category error")
-                continue
-                #error
-            _sql = 'select c_id from category where c_name=%s'
-            param = (c3.a.text.encode('utf-8'))
-            #get each third category and insert into database
-            cur.execute(_sql, param)
-            results = cur.fetchall()
-            if results is not None:
-                for rec in results:
-                    category_id = rec[0]
-                #print category_id
-                url_3 = "https://www.assaydepot.com" + c3.a['href'].encode('utf-8')
-                #print(url_3)
-                logging.info(url_3)
+    def run(self):
+        """category 2 thread function,in each second category"""
+
+        conn = sql()
+        cur = conn.cursor()
+        if self.category_3 is not None:
+            for c3 in self.category_3:
+                #for each second category
+                _sql = 'insert into category(c_name,c_category_1,c_category_2) values(%s,%s,%s)'
+                param = (c3.a.text.encode('utf-8'), self.category_1, self.category_2)
                 try:
-                    response = urllib2.urlopen(url_3)
+                    cur.execute(_sql, param)
+                    conn.commit()
                 except:
-                    #print("unable to open url " + url_3)
-                    logging.error("unable to open url " + url_3)
+                    #print 'insert category error'
+                    logging.error("insert category error " + c3.a.text.encode('utf-8') + ' ' + self.category_1 + ' ' + self.category_2)
                     continue
-                page = response.read()
-                soup = BeautifulSoup(page)
-                #get the third category page soup
-                url_services = get_services_url(soup)
+                    #error
+                _sql = 'select c_id from category where c_name=%s AND c_category_1=%s AND c_category_2=%s'
+                param = (c3.a.text.encode('utf-8'), self.category_1, self.category_2)
+                #get each third category and insert into database
+                cur.execute(_sql, param)
+                results = cur.fetchall()
+                if results is not None:
+                    for rec in results:
+                        category_id = rec[0]
+                    #print category_id
+                    url_3 = "https://www.assaydepot.com" + c3.a['href'].encode('utf-8')
+                    #print(url_3)
+                    logging.info(url_3)
+                    try:
+                        response = urllib2.urlopen(url_3)
+                    except:
+                        #print("unable to open url " + url_3)
+                        logging.error("unable to open url " + url_3)
+                        continue
+                    page = response.read()
+                    soup = BeautifulSoup(page)
+                    #get the third category page soup
+                    url_services = get_services_url(soup)
 
-                if url_services is not None:
-                    for url in url_services:
-                        #print("insert services!")
-                        logging.info("insert services!")
-                        id_services = get_services_description(url, cur, conn, category_id)
-                        get_provider(url, cur, conn, id_services, t_name)
-            else:
-                continue
+                    if url_services is not None:
+                        for url in url_services:
+                            #print("insert services!")
+                            logging.info("insert services!")
+                            id_services = get_services_description(url, cur, conn, category_id)
+                            get_provider(url, cur, conn, id_services, self.t_name)
+                else:
+                    continue
 
-    close_sql(cur, conn)
-    #print(t_name + " done!")
-    logging.info(t_name + "done!")
-    thread.exit_thread()
+        close_sql(cur, conn)
+        #print(t_name + " done!")
+        logging.info(self.t_name + "done!")
 
 
-def c_1(t_name, category_1):
-    """thread function in category1"""
+class C1(threading.Thread):
 
-    url = "https://www.assaydepot.com/better_categories/" + category_1
-    #print(url)
-    logging.info(url)
-    try:
-        response = urllib2.urlopen(url)
-    except:
-        #print("unable to open url " + url)
-        logging.error("unable to open url " + url)
-        return
-    page = response.read()
-    soup = BeautifulSoup(page)
-    items = soup.find_all("div", class_="well")
-    thread_id = 1
-    if items is not None:
-        for c2 in items:
-            category_2 = c2.find('h3').text.encode('utf-8')
-            category_3 = c2.find_all("li")
-            thread_name_1 = "Thread_" + category_1 + '_' + category_2 + '_' + str(thread_id)
-            thread_id += 1
-            try:
-                thread.start_new_thread(c_2, (thread_name_1, category_3, category_2, category_1))
-            except:
-                #print ("Unable to open thread" + thread_name_1)
-                logging.info("Unable to open thread" + thread_name_1)
-    #print t_name + " done!"
-    logging.info(t_name + " done!")
-    thread.exit_thread()
+    def __init__(self, t_name, category_1):
+        threading.Thread.__init__(self)
+        self.t_name = t_name
+        self.category_1 = category_1
+
+    def run(self):
+        """thread function in category1"""
+
+        url = "https://www.assaydepot.com/better_categories/" + self.category_1
+        #print(url)
+        logging.info(url)
+        try:
+            response = urllib2.urlopen(url)
+        except:
+            #print("unable to open url " + url)
+            logging.error("unable to open url " + url)
+            return
+        page = response.read()
+        soup = BeautifulSoup(page)
+        items = soup.find_all("div", class_="well")
+        thread_id = 1
+        if items is not None:
+            for c2 in items:
+                category_2 = c2.find('h3').text.encode('utf-8')
+                category_3 = c2.find_all("li")
+                thread_name_1 = "Thread_" + self.category_1 + '_' + category_2 + '_' + str(thread_id)
+                thread_id += 1
+                try:
+                    tt = C2(thread_name_1, self.category_1, category_2, category_3)
+                    #thread.start_new_thread(c_2, (thread_name_1, category_3, category_2, self.category_1))
+                except:
+                    #print ("Unable to open thread" + thread_name_1)
+                    logging.info("Unable to open thread" + thread_name_1)
+                    continue
+                tt.start()
+        #print t_name + " done!"
 
 
 if __name__ == "__main__":
@@ -338,12 +355,12 @@ if __name__ == "__main__":
     category_list = ['biology', 'chemistry', 'dmpk', 'pharmacology', 'toxicology']
     thread_id = 1
     for c1 in category_list:
-        #c1 = category_list[0]
+    #c1 = category_list[0]
         thread_name = "Thread" + '_' + c1 + '_' + str(thread_id)
         try:
-            thread.start_new_thread(c_1, (thread_name, c1))
+            t = C1(thread_name, c1)
         except:
             #print "ErrorL unable to start thread"
-            logging.error("ErrorL unable to start thread")
-    while 1:
-        pass
+            logging.error("Error unable to start thread")
+            continue
+        t.start()

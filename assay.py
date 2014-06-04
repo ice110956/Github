@@ -12,11 +12,30 @@ import logging
 from bs4 import BeautifulSoup
 import os
 import threading
+import time
 
 
 def log():
     logging.basicConfig(filename=os.path.join(os.getcwd(), 'log.txt'), level=logging.INFO, filemode='w')
 
+
+def open_url(url):
+    flag = False
+    for tr in range(3):
+        try:
+            response = urllib2.urlopen(url)
+            flag = True
+        except:
+            logging.info("open url " + url + 'fail and retry ' + str(tr))
+            time.sleep(1)
+            flag = False
+            #get url error and wait 2s
+            continue
+        break
+    if flag is False:
+        return False
+    else:
+        return response
 
 def translate(text):
     """translate English to Chinese"""
@@ -28,34 +47,48 @@ def translate(text):
     req = urllib2.Request(url, data)
     browser = "Mozilla/5.0 (Windows NT 6.1; WOW64)"
     req.add_header('User-Agent', browser)
-    try:
-        response = urllib2.urlopen(req)
-    except:
+    flag = False
+    for tr in range(3):
+        try:
+            response = urllib2.urlopen(req)
+            flag = True
+        except:
+            logging.info("google translate is unreachable and try again")
+            time.sleep(1)
+            flag = False
+            #get url error and wait 2s
+            continue
+        break
+    if flag is False:
         logging.error("google translate is unreachable!")
         return ""
     get_page = response.read()
     text_page = re.search('\[\[.*?\]\]', get_page).group()
     text_list = []
     rex = re.compile(r'\[\".*?\",')
-    for item in re.findall(rex, text_page):
-        item = item.replace('[', "")
-        item = item.replace('",', "")
-        item = item.replace('"', "")
-        text_list.append(item)
-    text_result = "".join(text_list)
+    re_find = re.findall(rex, text_page)
+    if len(re_find) != 0:
+        for item in re_find:
+            item = item.replace('[', "")
+            item = item.replace('",', "")
+            item = item.replace('"', "")
+            text_list.append(item)
+        text_result = "".join(text_list)
+    else:
+        text_result = ""
     return text_result
 
 
 def sql():
     """create a new connection to database
     return the connection"""
-
-    try:
-        conn = MySQLdb.connect(host='192.168.1.108', user='mdx', passwd='medeolinx86', db='mydb', port=3306,
-                               charset="utf8")
-    except Exception, e:
-        logging.error(e)
-        sys.exit()
+    for tr in range(3):
+        try:
+            conn = MySQLdb.connect(host='192.168.1.108', user='mdx', passwd='medeolinx86', db='mydb', port=3306,
+                                   charset="utf8")
+        except Exception, e:
+            logging.error(e)
+            sys.exit()
     return conn
 
 
@@ -73,12 +106,10 @@ def get_services_description(url, cur, conn, category_id):
 
     #print(url)
     logging.info(url)
-    try:
-        response = urllib2.urlopen(url)
-    except:
-        #print("unable to open url " + url)
-        logging.error("unable to open url " + url)
-        return
+    response = open_url(url)
+    if response is False:
+        logging.error("can not open url " + url)
+        return 0
     page = response.read()
     soup = BeautifulSoup(page)
     services_name = soup.find("h1").text.encode('utf-8')
@@ -98,8 +129,8 @@ def get_services_description(url, cur, conn, category_id):
         #print "insert service error"
         logging.error("insert service error")
 
-    _sql = 'select s_id from service where s_name=%s'
-    param = services_name
+    _sql = 'select s_id from service where s_name=%s AND c_id=%s'
+    param = (services_name, long(category_id))
     try:
         cur.execute(_sql, param)
     except:
@@ -107,7 +138,7 @@ def get_services_description(url, cur, conn, category_id):
         logging.error("get services' id error")
     results = cur.fetchall()
     services_id = 0
-    if results is not None:
+    if len(results) != 0:
         for rec in results:
             services_id = rec[0]
     return services_id
@@ -121,11 +152,9 @@ def get_provider_description(url, cur, conn, thread_name):
 
     #print url
     logging.info(url)
-    try:
-        response = urllib2.urlopen(url)
-    except:
-        #print("unable to open url " + url)
-        logging.error("unable to open url " + url)
+    response = open_url(url)
+    if response is False:
+        logging.error("can not open url " + url)
         return -1
     page = response.read()
     soup = BeautifulSoup(page)
@@ -135,17 +164,21 @@ def get_provider_description(url, cur, conn, thread_name):
     param = provider_name
     is_exist = cur.execute(_sql, param)
     if is_exist == 0:
-        #print provider_name + 'ready to insert'
+        #insert description
         provider = soup.find("div", id="provider_description")
         provider_description = provider.find_all("p")
         des = []
         for description in provider_description:
             des.append(description.text)
         des_str = "".join(des).encode('utf-8')
-        #print des_str
-        _sql = 'insert into provider(p_name,p_description,p_description_cn) values(%s,%s,%s)'
+
+        details = soup.find("div", class_="span3").find("div", class_="well")
+        det_str = details.text.encode('utf-8')
+        det_str = det_str.replace('\n', ' ')
+
+        _sql = 'insert into provider(p_name,p_description,p_description_cn,p_detail) values(%s,%s,%s,%s)'
         des_str_cn = translate(des_str)
-        param = (provider_name, des_str, des_str_cn)
+        param = (provider_name, des_str, des_str_cn, det_str)
         try:
             cur.execute(_sql, param)
             conn.commit()
@@ -176,11 +209,9 @@ def get_provider(url, cur, conn, id_services, thread_name):
 
     #print(url)
     logging.info(url)
-    try:
-        response = urllib2.urlopen(url)
-    except:
-        logging.error("unable to open url " + url)
-        #print("unable to open url " + url)
+    response = open_url(url)
+    if response is False:
+        logging.error("can not open url " + url)
         return
     page = response.read()
     soup = BeautifulSoup(page)
@@ -254,18 +285,18 @@ class C2(threading.Thread):
                     url_3 = "https://www.assaydepot.com" + c3.a['href'].encode('utf-8')
                     #print(url_3)
                     logging.info(url_3)
-                    try:
-                        response = urllib2.urlopen(url_3)
-                    except:
-                        #print("unable to open url " + url_3)
-                        logging.error("unable to open url " + url_3)
+                    flag = False
+                    response = open_url(url_3)
+                    if response is False:
+                        logging.error("can not open url " + url_3)
                         continue
                     page = response.read()
                     soup = BeautifulSoup(page)
                     #get the third category page soup
-
+                    url_services = []
                     while True:
                         #get the services per page until no page
+                        del url_services
                         url_services = []
                         items = soup.find_all("h4", class_="media-headig")
                         if items is None:
@@ -277,15 +308,22 @@ class C2(threading.Thread):
                             for item in items:
                                 url_services.append("http://www.assaydepot.com" + item.a['href'].encode('utf-8'))
                                 #print "serivices url is " + "http://www.assaydepot.com" + item.a['href']
+
+                        if url_services is not None:
+                            for url in url_services:
+                                #print("insert services!")
+                                logging.info("insert services!")
+                                id_services = get_services_description(url, cur, conn, category_id)
+                                get_provider(url, cur, conn, id_services, self.t_name)
+
                         next_page = soup.find("li", class_="next next_page ")
                         if next_page is not None:
                             #print "goto next page"
                             logging.info("go to next page")
                             url_next = "http://www.assaydepot.com" + next_page.a['href'].encode('utf-8')
-                            try:
-                                response = urllib2.urlopen(url_next)
-                            except:
-                                #print("unable to open url " + url_next)
+                            flag = False
+                            response = open_url(url_next)
+                            if response is False:
                                 logging.error("unable to open url " + url_next)
                                 break
                             page = response.read()
@@ -294,13 +332,6 @@ class C2(threading.Thread):
                             #print "no next page,out"
                             logging.info("no next page,out")
                             break
-
-                        if url_services is not None:
-                            for url in url_services:
-                                #print("insert services!")
-                                logging.info("insert services!")
-                                id_services = get_services_description(url, cur, conn, category_id)
-                                get_provider(url, cur, conn, id_services, self.t_name)
                 else:
                     continue
 
@@ -322,16 +353,15 @@ class C1(threading.Thread):
         url = "https://www.assaydepot.com/better_categories/" + self.category_1
         #print(url)
         logging.info(url)
-        try:
-            response = urllib2.urlopen(url)
-        except:
-            #print("unable to open url " + url)
-            logging.error("unable to open url " + url)
+        response = open_url(url)
+        if response is False:
+            logging.error("can not open url " + url)
             return
         page = response.read()
         soup = BeautifulSoup(page)
         items = soup.find_all("div", class_="well")
         thread_id = 1
+        threads = []
         if items is not None:
             for c2 in items:
                 category_2 = c2.find('h3').text.encode('utf-8')
@@ -346,10 +376,16 @@ class C1(threading.Thread):
                     logging.info("Unable to open thread" + thread_name_1)
                     continue
                 tt.start()
-        #print t_name + " done!"
+                threads.append(tt)
+
+        # 等待所有线程完成
+        for t in threads:
+            t.join()
+        print self.t_name + " done!"
 
 
 if __name__ == "__main__":
+    threadLock = threading.Lock()
     log()
     category_list = ['biology', 'chemistry', 'dmpk', 'pharmacology', 'toxicology']
     thread_id = 1
@@ -363,5 +399,6 @@ if __name__ == "__main__":
             logging.error("Error unable to start thread")
             continue
         t.start()
+        print thread_name
         t.join()
         #reduce to 1/5 thread

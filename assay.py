@@ -28,7 +28,11 @@ def translate(text):
     req = urllib2.Request(url, data)
     browser = "Mozilla/5.0 (Windows NT 6.1; WOW64)"
     req.add_header('User-Agent', browser)
-    response = urllib2.urlopen(req)
+    try:
+        response = urllib2.urlopen(req)
+    except:
+        logging.error("google translate is unreachable!")
+        return ""
     get_page = response.read()
     text_page = re.search('\[\[.*?\]\]', get_page).group()
     text_list = []
@@ -109,42 +113,6 @@ def get_services_description(url, cur, conn, category_id):
     return services_id
 
 
-def get_services_url(soup):
-    """to get the services' url in a second category in multi-page
-    return a list contain which all urls"""
-
-    url_services = []
-    while True:
-        items = soup.find_all("h4", class_="media-headig")
-        if items is None:
-            #print "find no services"
-            logging.info("find no services")
-        else:
-            #print "find services"
-            logging.info("find services")
-            for item in items:
-                url_services.append("http://www.assaydepot.com" + item.a['href'].encode('utf-8'))
-                #print "serivices url is " + "http://www.assaydepot.com" + item.a['href']
-        next_page = soup.find("li", class_="next next_page ")
-        if next_page is not None:
-            #print "goto next page"
-            logging.info("go to next page")
-            url_next = "http://www.assaydepot.com" + next_page.a['href'].encode('utf-8')
-            try:
-                response = urllib2.urlopen(url_next)
-            except:
-                #print("unable to open url " + url_next)
-                logging.error("unable to open url " + url_next)
-                break
-            page = response.read()
-            soup = BeautifulSoup(page)
-        else:
-            #print "no next page,out"
-            logging.info("no next page,out")
-            break
-    return url_services
-
-
 def get_provider_description(url, cur, conn, thread_name):
     """to get one service page 's description and insert into database
     request param of url and database connect and category_id
@@ -158,7 +126,7 @@ def get_provider_description(url, cur, conn, thread_name):
     except:
         #print("unable to open url " + url)
         logging.error("unable to open url " + url)
-        return
+        return -1
     page = response.read()
     soup = BeautifulSoup(page)
     provider_name = soup.find("h1").text.encode('utf-8')
@@ -278,6 +246,7 @@ class C2(threading.Thread):
                 #get each third category and insert into database
                 cur.execute(_sql, param)
                 results = cur.fetchall()
+                category_id = 0
                 if results is not None:
                     for rec in results:
                         category_id = rec[0]
@@ -294,14 +263,44 @@ class C2(threading.Thread):
                     page = response.read()
                     soup = BeautifulSoup(page)
                     #get the third category page soup
-                    url_services = get_services_url(soup)
 
-                    if url_services is not None:
-                        for url in url_services:
-                            #print("insert services!")
-                            logging.info("insert services!")
-                            id_services = get_services_description(url, cur, conn, category_id)
-                            get_provider(url, cur, conn, id_services, self.t_name)
+                    while True:
+                        #get the services per page until no page
+                        url_services = []
+                        items = soup.find_all("h4", class_="media-headig")
+                        if items is None:
+                            #print "find no services"
+                            logging.info("find no services")
+                        else:
+                            #print "find services"
+                            logging.info("find services")
+                            for item in items:
+                                url_services.append("http://www.assaydepot.com" + item.a['href'].encode('utf-8'))
+                                #print "serivices url is " + "http://www.assaydepot.com" + item.a['href']
+                        next_page = soup.find("li", class_="next next_page ")
+                        if next_page is not None:
+                            #print "goto next page"
+                            logging.info("go to next page")
+                            url_next = "http://www.assaydepot.com" + next_page.a['href'].encode('utf-8')
+                            try:
+                                response = urllib2.urlopen(url_next)
+                            except:
+                                #print("unable to open url " + url_next)
+                                logging.error("unable to open url " + url_next)
+                                break
+                            page = response.read()
+                            soup = BeautifulSoup(page)
+                        else:
+                            #print "no next page,out"
+                            logging.info("no next page,out")
+                            break
+
+                        if url_services is not None:
+                            for url in url_services:
+                                #print("insert services!")
+                                logging.info("insert services!")
+                                id_services = get_services_description(url, cur, conn, category_id)
+                                get_provider(url, cur, conn, id_services, self.t_name)
                 else:
                     continue
 
@@ -364,3 +363,5 @@ if __name__ == "__main__":
             logging.error("Error unable to start thread")
             continue
         t.start()
+        t.join()
+        #reduce to 1/5 thread

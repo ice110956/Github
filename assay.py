@@ -3,7 +3,6 @@
 __author__ = 'Patrick'
 
 import MySQLdb
-import thread
 import sys
 import urllib2
 import re
@@ -16,7 +15,7 @@ import time
 
 
 def log():
-    logging.basicConfig(filename=os.path.join(os.getcwd(), 'log.txt'), level=logging.INFO, filemode='w')
+    logging.basicConfig(filename=os.path.join(os.getcwd(), 'log.txt'), level=logging.INFO, format='%(asctime)s %(thread)d %(funcName)s', filemode='w')
 
 
 def open_url(url):
@@ -29,7 +28,7 @@ def open_url(url):
             logging.info("open url " + url + 'fail and retry ' + str(tr))
             time.sleep(1)
             flag = False
-            #get url error and wait 2s
+            #get url error and wait 1s
             continue
         break
     if flag is False:
@@ -56,7 +55,7 @@ def translate(text):
             logging.info("google translate is unreachable and try again")
             time.sleep(1)
             flag = False
-            #get url error and wait 2s
+            #get url error and wait 1s
             continue
         break
     if flag is False:
@@ -104,7 +103,6 @@ def get_services_description(url, cur, conn, category_id):
     request param of url and database connect and category_id
     return the services id for further use"""
 
-    #print(url)
     logging.info(url)
     response = open_url(url)
     if response is False:
@@ -126,7 +124,6 @@ def get_services_description(url, cur, conn, category_id):
         cur.execute(_sql, param)
         conn.commit()
     except:
-        #print "insert service error"
         logging.error("insert service error")
 
     _sql = 'select s_id from service where s_name=%s AND c_id=%s'
@@ -134,7 +131,6 @@ def get_services_description(url, cur, conn, category_id):
     try:
         cur.execute(_sql, param)
     except:
-        #print "get services' id error"
         logging.error("get services' id error")
     results = cur.fetchall()
     services_id = 0
@@ -150,7 +146,6 @@ def get_provider_description(url, cur, conn, thread_name):
     return provider id
     if provider is overlap return -1"""
 
-    #print url
     logging.info(url)
     response = open_url(url)
     if response is False:
@@ -278,14 +273,11 @@ class C2(threading.Thread):
                 cur.execute(_sql, param)
                 results = cur.fetchall()
                 category_id = 0
-                if results is not None:
+                if len(results) != 0:
                     for rec in results:
                         category_id = rec[0]
-                    #print category_id
                     url_3 = "https://www.assaydepot.com" + c3.a['href'].encode('utf-8')
-                    #print(url_3)
                     logging.info(url_3)
-                    flag = False
                     response = open_url(url_3)
                     if response is False:
                         logging.error("can not open url " + url_3)
@@ -294,34 +286,32 @@ class C2(threading.Thread):
                     soup = BeautifulSoup(page)
                     #get the third category page soup
                     url_services = []
+                    page = 1
                     while True:
+                        logging.info("in page " + str(page))
                         #get the services per page until no page
                         del url_services
                         url_services = []
                         items = soup.find_all("h4", class_="media-headig")
-                        if items is None:
-                            #print "find no services"
+                        if len(items) == 0:
                             logging.info("find no services")
+                            break
                         else:
-                            #print "find services"
                             logging.info("find services")
                             for item in items:
                                 url_services.append("http://www.assaydepot.com" + item.a['href'].encode('utf-8'))
                                 #print "serivices url is " + "http://www.assaydepot.com" + item.a['href']
 
-                        if url_services is not None:
+                        if len(url_services) != 0:
                             for url in url_services:
-                                #print("insert services!")
                                 logging.info("insert services!")
                                 id_services = get_services_description(url, cur, conn, category_id)
                                 get_provider(url, cur, conn, id_services, self.t_name)
 
                         next_page = soup.find("li", class_="next next_page ")
                         if next_page is not None:
-                            #print "goto next page"
                             logging.info("go to next page")
                             url_next = "http://www.assaydepot.com" + next_page.a['href'].encode('utf-8')
-                            flag = False
                             response = open_url(url_next)
                             if response is False:
                                 logging.error("unable to open url " + url_next)
@@ -329,7 +319,6 @@ class C2(threading.Thread):
                             page = response.read()
                             soup = BeautifulSoup(page)
                         else:
-                            #print "no next page,out"
                             logging.info("no next page,out")
                             break
                 else:
@@ -362,7 +351,7 @@ class C1(threading.Thread):
         items = soup.find_all("div", class_="well")
         thread_id = 1
         threads = []
-        if items is not None:
+        if len(items) != 0:
             for c2 in items:
                 category_2 = c2.find('h3').text.encode('utf-8')
                 category_3 = c2.find_all("li")
@@ -372,7 +361,6 @@ class C1(threading.Thread):
                     tt = C2(thread_name_1, self.category_1, category_2, category_3)
                     #thread.start_new_thread(c_2, (thread_name_1, category_3, category_2, self.category_1))
                 except:
-                    #print ("Unable to open thread" + thread_name_1)
                     logging.info("Unable to open thread" + thread_name_1)
                     continue
                 tt.start()
@@ -390,15 +378,12 @@ if __name__ == "__main__":
     category_list = ['biology', 'chemistry', 'dmpk', 'pharmacology', 'toxicology']
     thread_id = 1
     for c1 in category_list:
-    #c1 = category_list[0]
         thread_name = "Thread" + '_' + c1 + '_' + str(thread_id)
         try:
             t = C1(thread_name, c1)
         except:
-            #print "ErrorL unable to start thread"
             logging.error("Error unable to start thread")
             continue
         t.start()
         print thread_name
         t.join()
-        #reduce to 1/5 thread

@@ -93,7 +93,11 @@ def similarity(lay_out, express):
         else:
             pass
     length = len(express)
-    result = (lay_out['name'], lay_out['user'], w, overlap/length, overlap_list)
+    lap = str(overlap) + '(' + str(round(1.0*overlap/length*100)) + '%)'
+    result = (lay_out['name'], lay_out['user'], w, lap, overlap_list)
+    #result是元组
+    print lap
+    print overlap, length, round(1.0*overlap/length*100)
     return result
 
 
@@ -106,38 +110,63 @@ def sort(similar):
 
 
 class Th(threading.Thread):
-    def __init__(self, layout, express):
+    """the thread class to handle the connect
+    receive the express and send the sorted retult"""
+
+    def __init__(self, connection, layout):
         threading.Thread.__init__(self)
         self.layout = layout
-        self.express = express
+        self.con = connection
 
     def run(self):
+        try:
+            self.con.settimeout(10)
+            buf = self.con.recv(1024000)
+            #10240表示最大包大小
+            express = simplejson.loads(buf)
+        except socket.timeout:
+            print 'rec time out'
+            return
         res = []
         for l in self.layout:
-            res.append(similarity(l, self.express))
+            res.append(similarity(l, express))
         top = sort(res)
-        print type(top)
-        print top
+        #top为列表，其中元素为元组
+        try:
+            self.con.settimeout(10)
+            self.con.send(simplejson.dumps(top))
+            print simplejson.dumps(top)
+        except socket.timeout:
+            print "send result time out"
+        self.con.close()
 
 
 def new_service():
+    """start a service socket and listen
+    when coms a connection, start a new thread to handle it"""
+
     sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         sock.bind(('localhost', 3368))
-        sock.listen(100)
-        print "bing 3368,ready to use"
+        sock.listen(1000)
+        #链接队列大小
+        print "bind 3368,ready to use"
     except:
         print("Server is already running,quit")
         sys.exit()
     layout = read_layouts()
+
     while True:
         connection, address = sock.accept()
+        #返回元组（socket,add），accept调用时会进入waite状态
         print "Got connection from ", address
-        buf = connection.recv(10240)
-        express = simplejson.loads(buf)
-        t = Th(layout, express)
-        t.start()
-        print 'new thread for client ...'
+        try:
+            t = Th(connection, layout)
+            t.start()
+            print 'new thread for client ...'
+        except:
+            print 'start new thread error'
+            connection.close()
 
 
 if __name__ == '__main__':

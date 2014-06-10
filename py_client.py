@@ -1,5 +1,5 @@
 # _*_ coding:utf-8 _*_
-__author__ = 'Tony'
+__author__ = 'Patrick'
 
 
 import socket
@@ -32,16 +32,19 @@ def new_client():
         #绑定本地地址,端口3368
         print "get the service"
     except:
-        print("Server is unaviable")
+        print("Server is unavailable")
         sys.exit()
     ex = read_express()
+    print ex
     json_object = simplejson.dumps(ex)
     sock.send(json_object)
-    json_recv = sock.recv(1024)
+    json_recv = sock.recv(1024000)
     print json_recv
+    print type(json_recv)
+    print simplejson.loads(json_recv)
+    print type(simplejson.loads(json_recv))
     sock.close()
     return
-
 
 
 if __name__ == '__main__':

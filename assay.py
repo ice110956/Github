@@ -141,10 +141,10 @@ def get_services_description(url, cur, conn, category_id):
 
 
 def get_provider_description(url, cur, conn, thread_name):
-    """to get one service page 's description and insert into database
+    """to get one provider page 's description and insert into database
     request param of url and database connect and category_id
     return provider id
-    if provider is overlap return -1"""
+    if error return -1"""
 
     logging.info(url)
     response = open_url(url)
@@ -179,23 +179,18 @@ def get_provider_description(url, cur, conn, thread_name):
             conn.commit()
         except:
             logging.info("overlap insert provider" + provider_name)
-            return -1
 
         #return provider id
-        _sql = 'select p_id from provider where p_name=%s'
-        param = provider_name
-        cur.execute(_sql, param)
-        results = cur.fetchall()
-        provider_id = 0
-        if results is not None:
-            for rec in results:
-                provider_id = rec[0]
-        #print provider_id
-        return provider_id
-    else:
-        #print provider_name + 'is overlap'
-        #logging.info(provider_name + ' is old in thread ' + thread_name)
-        return -1
+    _sql = 'select p_id from provider where p_name=%s'
+    param = provider_name
+    cur.execute(_sql, param)
+    results = cur.fetchall()
+    provider_id = -1
+    if len(results) != 0:
+        for rec in results:
+            provider_id = rec[0]
+    #print provider_id
+    return provider_id
 
 
 def get_provider(url, cur, conn, id_services, thread_name):
@@ -214,7 +209,7 @@ def get_provider(url, cur, conn, id_services, thread_name):
     ul = span.find("ul")
     providers = ul.find_all("li")
     url_list = []
-    if providers is not None:
+    if len(providers) != 0:
         for p in providers:
             url_list.append('https://www.assaydepot.com' + p.a['href'].encode('utf-8'))
 
@@ -286,9 +281,10 @@ class C2(threading.Thread):
                     soup = BeautifulSoup(page)
                     #get the third category page soup
                     url_services = []
-                    page = 1
+                    page_num = 0
                     while True:
-                        logging.info("in page " + str(page))
+                        page_num += 1
+                        logging.info("in page " + str(page_num))
                         #get the services per page until no page
                         del url_services
                         url_services = []

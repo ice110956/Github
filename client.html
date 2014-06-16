@@ -1,15 +1,62 @@
 <!DOCTYPE html>
+<meta charset="UTF-8">
 <html>
 <head>
     <title></title>
 </head>
 <body>
+<div id='more2'>
+ <input id="Expression" type="file" name="attach2" size="50"/>
+</div>
+
 <script src="jquery-1.9.1.min.js"></script>
 <script src="jquery.json-2.4.min.js"></script>
 <script src="jquery.websocket-0.0.1.js"></script>
+
 <script>
-    var ws = new WebSocket('ws://localhost:3368')
-    ws.send("haha")
+var ws = $.websocket("ws://localhost:3368/chat");
+ws.onopen = function(evt) {
+    console.log("huhu")
+};
+
+ws.onclose = function(evt) {
+    console.log("it is closing")
+};
+
+ ws.onerror = function(event){
+console.error(event);
+alert("发生了错误,onError可省略不写");
+};
+ws.onsend = function(msg){
+alert("发送数据额外的代码,可省略不写");
+};
+ws.onmessage = function(result,nTime){
+alert("从服务端收到的数据:" + result);
+alert("最近一次发送数据到现在接收一共使用时间:" + nTime);
+console.log(result);
+}
+
+
+function readSingleFile(evt) {
+	var f = evt.target.files[0];
+		// //=========启动一个websocket
+
+	if (f) {
+		var r = new FileReader();
+		r.onload = function(e) {
+		console.log("ok");
+		    str=e.target.result;
+		    ws.send(str);
+		    console.info('msg has sent to python server');
+		};
+		r.readAsText(f);
+        //ws.close();
+
+	}
+}
+document.getElementById('Expression').addEventListener('change', readSingleFile, false);
+
 </script>
+
 </body>
 </html>

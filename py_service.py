@@ -24,6 +24,7 @@ HANDSHAKE_STRING = "HTTP/1.1 101 Switching Protocols\r\n" \
                    "Sec-WebSocket-Accept: {1}\r\n" \
                    "WebSocket-Location: ws://{2}/chat\r\n" \
                    "WebSocket-Protocol:chat\r\n\r\n"
+Hash = ['111', '222', '333']
 
 
 def log():
@@ -134,6 +135,9 @@ class Th(threading.Thread):
     def run(self):
         while True:
             try:
+                hash = self.recv_data(1024)
+                if hash not in Hash:
+                    break
                 buf = self.recv_data(102400)
                 buf = buf[9:len(buf)-2]
                 line = buf.split(r"\r\n")
@@ -160,7 +164,7 @@ class Th(threading.Thread):
                 print simplejson.dumps(top)
             except:
                 print "send result time out"
-            #self.con.close()
+        self.con.close()
 
     def recv_data(self, num):
         try:

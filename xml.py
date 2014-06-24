@@ -8,6 +8,9 @@ import logging
 import sys
 
 
+res = re.compile(' {2,}')
+
+
 def log():
     logging.basicConfig(filename=os.path.join(os.getcwd(), 'log.txt'), level=logging.INFO, format='%(asctime)s %(thread)d %(funcName)s %(levelname)s %(message)s', filemode='w')
 
@@ -23,6 +26,19 @@ def sql():
             logging.error(e)
             sys.exit()
     return conn
+
+
+def pro_str(st):
+    """字符串预处理，变小写，去_,-,'s,多个空格等"""
+
+    st = st.lower()
+    st = st.replace("-", ' ')
+    st = st.replace("_", ' ')
+    st = st.replace("'s", '')
+    st = st.replace(",", '')
+    st = st.strip()
+    st = re.sub(res, ' ', st)
+    return st
 
 
 def get_xml(f_name, s):
@@ -52,18 +68,22 @@ def get_xml(f_name, s):
             break
     f.close()
     se = set(li)
-    li = [i for i in se]
-    #去重
+    print "process..."
+    li = [pro_str(i) for i in se]
+    print "over"
     conn = sql()
     cur = conn.cursor()
     _sql = 'insert into des(d_name) values(%s)'
+    param = []
     for j in li:
-        param = (j)
-        try:
-            cur.execute(_sql, param)
-            conn.commit()
-        except:
-            logging.error("insert error")
+        param.append((j,))
+    cur.executemany(_sql, param)
+    conn.commit()
+       # try:
+         #   cur.execute(_sql, param)
+        #    conn.commit()
+       # except:
+          # logging.error("insert error")
 
 if __name__ == '__main__':
     os.chdir('xml')
@@ -72,6 +92,6 @@ if __name__ == '__main__':
     #for l in f_list:
     #s = 'DescriptorName'
     #get_xml('desc2014', s)
-    l = f_list[0]
+    l = f_list[1]
     get_xml(l, s)
     print l + 'done!'

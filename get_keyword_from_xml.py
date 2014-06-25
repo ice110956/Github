@@ -2,8 +2,8 @@
 # -*- coding: utf-8 -*-
 __author__ = 'Patrick'
 #读取xml中的内容，提取关键字‘**Name’,写入数据库中，配合程序match.py用于匹配
-#输入：需要XML文件，无输入
-#输出：写入database，无输出
+#输入：keyword文件夹下的XML文件，无输入
+#输出：写入database，格式：des（id，d_name）无输出
 
 import os
 import re
@@ -52,13 +52,13 @@ def get_xml(f_name, s):
 
     file_name = f_name + '.xml'
     f = open(file_name)
-    res = re.compile(s + '>')
+    res_0 = re.compile(s + '>')
     res_1 = re.compile('</.*?>')
     li = []
     while True:
         name = f.readline()
         if name:
-            if res.search(name):
+            if res_0.search(name):
                 #print name
                 if not res_1.search(name):
                     name = f.readline().strip().replace('<String>', '').replace('</String>', '').replace('&amp; ', '')
@@ -90,7 +90,7 @@ def get_xml(f_name, s):
         print 'inser into database error'
 
 if __name__ == '__main__':
-    os.chdir('xml')
+    os.chdir('keyword')
     f_list = ['pa2014', 'desc2014', 'qual2014', 'supp2014']
     s = 'Name'
     #s 是要匹配的字符

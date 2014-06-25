@@ -1,12 +1,16 @@
 #!usr/bin/python
 # -*- coding: utf-8 -*-
 __author__ = 'Patrick'
+#根据GEO数据库的比较，得到的两个文件（-1.txt,1.txt）获取其中的前n个有用的信息，写入文件中
+#输入：GEO_compare文件夹下的两个文件：-1.txt(小于)，1.txt(大于)
+#输出：result.txt文件，得到2*n个关键字及值
 
 import os
 import re
+import sys
 
 
-def vs(num):
+def compare(num):
     """read the -1.txt and 1.txt files
     and get the info into the result.txt
     在vs文件加下，加载-1.txt,1.txt两个文件
@@ -18,8 +22,12 @@ def vs(num):
     res = re.compile('\s$')
     gen_list = []
     for f in file_list:
-        fi = open(f)
-        fi_t = fi.read().splitlines()
+        try:
+            fi = open(f)
+            fi_t = fi.read().splitlines()
+        except:
+            print 'open file' + f + 'error'
+            sys.exit()
         count = 1
         for text in fi_t:
             if r.match(text):
@@ -56,8 +64,8 @@ def vs(num):
     fi.close()
 
 if __name__ == '__main__':
-    os.chdir('vs')
+    os.chdir('GEO_compare')
     #文件放在vs文件夹下
     n = 100
     #这里为提取前n个词条
-    vs(n)
+    compare(n)

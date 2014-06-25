@@ -1,5 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
+__author__ = 'Patrick'
+#下载"http://www.ncbi.nlm.nih.gov/sites/GDSbrowser?acc="中的指定内容
+#包括download中的文件，压缩文件解压，描述写入txt中（中英文）
+#全部放入同名文件夹里
+
 
 import urllib2
 import urllib
@@ -14,6 +19,84 @@ from bs4 import BeautifulSoup
 import time
 
 
+def un_gz(file_name):
+    """解压 gz file"""
+    f_name = file_name.replace(".gz", "")
+    try:
+        g_file = gzip.GzipFile(file_name)
+        open(f_name, "w+").write(g_file.read())
+    except:
+        print 'ungz error'
+        return
+    g_file.close()
+    os.remove(file_name)
+
+
+def un_zip(file_name):
+    """解压 zip file"""
+    zip_file = zipfile.ZipFile(file_name)
+    if os.path.isdir(file_name + "_files"):
+        pass
+    else:
+        os.mkdir(file_name + "_files")
+    for names in zip_file.namelist():
+        try:
+            zip_file.extract(names, file_name + "_files/")
+        except:
+            print 'unzip file ' + file_name + ' error'
+            return
+    zip_file.close()
+    os.remove(file_name)
+
+
+def un_tar(file_name):
+    """解压 tar file"""
+    tar = tarfile.open(file_name)
+    names = tar.getnames()
+    if os.path.isdir(file_name + "_files"):
+        pass
+    else:
+        os.mkdir(file_name + "_files")
+    for name in names:
+        try:
+            tar.extract(name, file_name + "_files/")
+        except:
+            print 'untar file ' + file_name + ' error'
+            return
+    tar.close()
+    os.remove(file_name)
+
+
+def un_rar(file_name):
+    """解压 rar file"""
+    rar = rarfile.RarFile(file_name)
+    if os.path.isdir(file_name + "_files"):
+        pass
+    else:
+        os.mkdir(file_name + "_files")
+    os.chdir(file_name + "files")
+    try:
+        rar.extractall()
+    except:
+        print 'unrar file ' + file_name + ' error'
+        return
+    os.chdir("../")
+    rar.close()
+
+
+def extract_file(file_name):
+    """extract all kind of file"""
+    if file_name.find(".zip") >= 0:
+        un_zip(file_name)
+    if file_name.find(".gz") >= 0:
+        un_gz(file_name)
+    if file_name.find(".tar") >= 0:
+        un_tar(file_name)
+    if file_name.find(".tgz") >= 0:
+        un_tar(file_name)
+    print('done!')
+
+
 class HtmlModel(object):
     """download the description and files
     下载http://www.ncbi.nlm.nih.gov/sites/GDSbrowser中指定的内容，描述写入name_description.txt文件
@@ -22,55 +105,6 @@ class HtmlModel(object):
     def __init__(self):
         self.page = ""
 
-    @staticmethod
-    def un_gz(file_name):
-        """解压gz file"""
-        f_name = file_name.replace(".gz", "")
-        g_file = gzip.GzipFile(file_name)
-        open(f_name, "w+").write(g_file.read())
-        g_file.close()
-        os.remove(file_name)
-
-    @staticmethod
-    def un_zip(file_name):
-        """解压 zip file"""
-        zip_file = zipfile.ZipFile(file_name)
-        if os.path.isdir(file_name + "_files"):
-            pass
-        else:
-            os.mkdir(file_name + "_files")
-        for names in zip_file.namelist():
-            zip_file.extract(names,file_name + "_files/")
-        zip_file.close()
-        os.remove(file_name)
-
-    @staticmethod
-    def un_tar(file_name):
-        """解压tar file"""
-        tar = tarfile.open(file_name)
-        names = tar.getnames()
-        if os.path.isdir(file_name + "_files"):
-            pass
-        else:
-            os.mkdir(file_name + "_files")
-        for name in names:
-            tar.extract(name, file_name + "_files/")
-        tar.close()
-        os.remove(file_name)
-
-    @staticmethod
-    def un_rar(file_name):
-        """解压 rar file"""
-        rar = rarfile.RarFile(file_name)
-        if os.path.isdir(file_name + "_files"):
-            pass
-        else:
-            os.mkdir(file_name + "_files")
-        os.chdir(file_name + "files")
-        rar.extractall()
-        os.chdir("../")
-        rar.close()
-    
     #translate
     @staticmethod
     def translate(text):
@@ -189,21 +223,11 @@ class HtmlModel(object):
             print('download ' + local + '...')
             print url, local
             urllib.urlretrieve(url, local, cbk)
-            #根据名字解压相应文件
-            if url.find(".zip") >= 0:
-                self.un_zip(local)
-            if url.find(".gz") >= 0:
-                self.un_gz(local)
-            if url.find(".tar") >= 0:
-                self.un_tar(local)
-            if url.find(".tgz") >= 0:
-                self.un_tar(local)
-            print('done!')
+
+            #解压
+            extract_file(local)
 
 if __name__ == "__main__":
-    #下载"http://www.ncbi.nlm.nih.gov/sites/GDSbrowser?acc="中的指定内容
-    #包括download中的文件，压缩文件解压，描述写入txt中（中英文）
-    #全部放入同名文件夹里
 
     myModel = HtmlModel()
     arg_len = len(sys.argv)

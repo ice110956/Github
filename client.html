@@ -14,7 +14,7 @@
 <script src="jquery.websocket-0.0.1.js"></script>
 
 <script>
-var ws = $.websocket("ws://localhost:3368/chat");
+var socket = new WebSocket('ws://localhost:3368');
 ws.onopen = function(evt) {
     console.log("huhu")
 };
@@ -25,13 +25,10 @@ ws.onclose = function(evt) {
 
  ws.onerror = function(event){
 console.error(event);
-alert("发生了错误,onError可省略不写");
-};
-ws.onsend = function(msg){
-alert("发送数据额外的代码,可省略不写");
+alert("发生了错误");
 };
 ws.onmessage = function(result,nTime){
-alert("从服务端收到的数据:" + result);
+alert("从服务端收到的数据:");
 alert("最近一次发送数据到现在接收一共使用时间:" + nTime);
 console.log(result);
 }

@@ -1,5 +1,6 @@
-#!/usr/bin/python
+#!usr/bin/python
 # -*- coding: utf-8 -*-
+__author__ = 'Patrick'
 
 import urllib2
 import urllib
@@ -16,15 +17,15 @@ import time
 
 class HtmlModel(object):
     """download the description and files
-    下载http://www.ncbi.nlm.nih.gov/sites/GDSbrowser中指定的内容，描述写入name_description.txt文件
-    压缩文件夹解压，全部放入同名文件夹"""
+    下载 https://www.ebi.ac.uk/arrayexpress/experiments/browse.html 中的指定数据
+    包括描述以及文件，描述写入txt中，下载的文件解压后放入当前文件夹"""
 
     def __init__(self):
         self.page = ""
 
     @staticmethod
     def un_gz(file_name):
-        """解压gz file"""
+        """解压 gz file"""
         f_name = file_name.replace(".gz", "")
         g_file = gzip.GzipFile(file_name)
         open(f_name, "w+").write(g_file.read())
@@ -40,13 +41,13 @@ class HtmlModel(object):
         else:
             os.mkdir(file_name + "_files")
         for names in zip_file.namelist():
-            zip_file.extract(names,file_name + "_files/")
+            zip_file.extract(names, file_name + "_files/")
         zip_file.close()
         os.remove(file_name)
 
     @staticmethod
     def un_tar(file_name):
-        """解压tar file"""
+        """解压 tar file"""
         tar = tarfile.open(file_name)
         names = tar.getnames()
         if os.path.isdir(file_name + "_files"):
@@ -70,7 +71,7 @@ class HtmlModel(object):
         rar.extractall()
         os.chdir("../")
         rar.close()
-    
+
     #translate
     @staticmethod
     def translate(text):
@@ -117,9 +118,10 @@ class HtmlModel(object):
         return text_result
 
     def get_page(self, page):
-        """main method"""
+        """主方法"""
+
         self.page = page
-        my_url = "http://www.ncbi.nlm.nih.gov/sites/GDSbrowser?acc=" + self.page
+        my_url = "https://www.ebi.ac.uk/arrayexpress/experiments/" + self.page
         try:
             my_response = urllib2.urlopen(my_url)
         except:
@@ -128,40 +130,21 @@ class HtmlModel(object):
         my_page = my_response.read()
         soup = BeautifulSoup(my_page)
 
-        #get description
+        #获得描述
         #in English
         des_name = []
         des_value = []
-        details = soup.find("div", id="details")
-        if details is None:
-            print("Wrong name!")
-            return
-        for item in details.findAll('th', class_="not_caption"):
-            text_name = ""
-            for string in item.stripped_strings:
-                tt = repr(string).encode('utf-8')
-                tt = tt.replace("u", "")
-                tt = tt.replace("\n", "")
-                tt = tt.replace("\'", "")
-                text_name += tt
-            print(text_name)
-            des_name.append(text_name)
-            text_value = ""
-            for string in item.next_sibling.stripped_strings:
-                tt = repr(string).encode('utf-8')
-                tt = tt.replace("u", "")
-                tt = tt.replace("\n", "")
-                tt = tt.replace("\'", "")
-                text_value += tt
-            print(text_value)
-            des_value.append(text_value)
+        for item in soup.findAll('td', class_='name'):
+            des_name.append(item.text)
+        for item in soup.findAll('td', class_='value'):
+            des_value.append(item.text)
         f = file(self.page + '_description' + '.txt', 'w+')
         print('down description')
         for i in range(0, len(des_name)):
-            text_name = des_name[i]
-            text_value = des_value[i]
-            text = "<"+text_name + text_value+">" + "\n\r"
-            #print(text)
+            text_name = des_name[i].encode('utf-8')
+            text_value = des_value[i].encode('utf-8')
+            text = "<"+text_name+","+text_value+">" + "\n\r"
+            #print(Item)
             f.write(text)
         f.close()
 
@@ -170,7 +153,8 @@ class HtmlModel(object):
         for i in range(0, len(des_name)):
             text_name = self.translate(des_name[i].encode('utf-8'))
             text_value = self.translate(des_value[i].encode('utf-8'))
-            text = "<" + text_name + text_value + ">" + "\n\r"
+            text = "<" + text_name + "," + text_value + ">" + "\n\r"
+            #print(Item)
             f.write(text)
         f.close()
         print('done!')
@@ -181,15 +165,15 @@ class HtmlModel(object):
             if per > 100:
                 per = 100
             print 'completed %.2f%%' % per
-        for item in soup.findAll('a', href=re.compile("ftp.*")):
-            print "find ftp"
-            url = item.get('href')
-            replace_char = re.compile('/.*/')
-            local = replace_char.sub("", url)
-            print('download ' + local + '...')
-            print url, local
+
+        for item in soup.findAll('a', attrs={'class': 'icon icon-functional', 'data-icon': '='}):
+            sub_url = item.get('href')
+            replace_char = re.compile("/.*/")
+            url = "https://www.ebi.ac.uk" + sub_url
+            local = replace_char.sub("", sub_url)
+            print('download '+local + '...')
             urllib.urlretrieve(url, local, cbk)
-            #根据名字解压相应文件
+            #根据不同的后缀名，解压不同压缩文件
             if url.find(".zip") >= 0:
                 self.un_zip(local)
             if url.find(".gz") >= 0:
@@ -201,10 +185,8 @@ class HtmlModel(object):
             print('done!')
 
 if __name__ == "__main__":
-    #下载"http://www.ncbi.nlm.nih.gov/sites/GDSbrowser?acc="中的指定内容
-    #包括download中的文件，压缩文件解压，描述写入txt中（中英文）
-    #全部放入同名文件夹里
-
+    #通过命令行读取多个要下载的页面名
+    #在当前目录下新建同名文件夹，把下载的内容放入
     myModel = HtmlModel()
     arg_len = len(sys.argv)
     if arg_len <= 1:
@@ -214,6 +196,6 @@ if __name__ == "__main__":
             pass
         else:
             os.mkdir(sys.argv[i])
-        os.chdir(sys.argv[i])
+            os.chdir(sys.argv[i])
         myModel.get_page(sys.argv[i])
         os.chdir('../')

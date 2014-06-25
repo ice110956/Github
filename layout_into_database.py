@@ -56,16 +56,21 @@ if __name__ == '__main__':
 
         _sql = "insert into info (l_id,l_name,l_user) values(%s,%s,%s)"
         param = (int(id), f.replace('.txt', ''), 'patrick')
-        cur.execute(_sql, param)
-        conn.commit()
+        try:
+            cur.execute(_sql, param)
+            conn.commit()
+        except:
+            print 'insert into database error'
+            continue
         for item in l_list:
             _sql = "insert into lay (l_id,pos_x,pos_y,width,g_name) values(%s,%s,%s,%s,%s)"
             param = (int(id), item[2], item[3], item[1], item[0])
             print param
-            #try:
-            cur.execute(_sql, param)
-            #except:
-                #print "insert errror"
+            try:
+                cur.execute(_sql, param)
+            except:
+                print "insert error"
+                continue
             conn.commit()
         id += 1
     close_sql(cur, conn)
